@@ -36,13 +36,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # ⚠️ 不要写 `version:`。
+      # package.json 里已有 `packageManager: "pnpm@9.15.4"`；
+      # 一旦这里再指定 version，pnpm/action-setup 会以
+      # "Multiple versions of pnpm specified" 直接失败（10 秒内退出）。
+      # 让它读 packageManager 字段即可，也保证 CI 与本地版本一致。
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
+      # Node 版本与开发机保持一致（本机 v24）。
+      # 不要降到 22：`--experimental-strip-types` 与 `--test` 的 glob 支持都有差异。
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
 
       - name: 安装依赖
