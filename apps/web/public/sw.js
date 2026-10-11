@@ -10,12 +10,24 @@
  *
  * ⚠️ 为什么手写而不是引入 Workbox：
  * 体积预算只剩十几 KB（AGENTS.md §0.0）。这里的需求只有"离线打开 + 缓存静态资源"，
- * 手写 60 行足够，且行为完全可读、可解释。
+ * 手写足够，且行为完全可读、可解释。
+ *
+ * ⚠️ 为什么要推导 BASE：
+ * 本文件是 `public/` 下的普通 JS，**不经 Vite 处理**，所以 `import.meta.env.BASE_URL`
+ * 用不了。部署到 GitHub Pages 时站点在 `/petfocus/` 子目录下，
+ * 写死 `/index.html` 会命中错误的路径。
+ * 这里从注册作用域（`self.registration.scope`）反推：
+ *   - Vercel / 本地：scope = `https://host/`        → BASE = `/`
+ *   - GitHub Pages ：scope = `https://host/petfocus/` → BASE = `/petfocus/`
  *
  * 更新策略：`CACHE_VERSION` 变更会触发 activate 时清掉旧缓存。
  */
-const CACHE_VERSION = 'petfocus-v1';
-const PRECACHE = ['/', '/index.html', '/manifest.webmanifest'];
+const CACHE_VERSION = 'petfocus-v2';
+
+/** 站点根路径，含首尾斜杠（例如 `/` 或 `/petfocus/`） */
+const BASE = new URL(self.registration.scope).pathname;
+
+const PRECACHE = [BASE, `${BASE}index.html`, `${BASE}manifest.webmanifest`];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -31,6 +43,8 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
+      // 注意是 caches.delete(key)（删除整个旧缓存），不是 cache.delete(key)。
+      // 后者会引用未定义变量并抛 ReferenceError，导致旧缓存永远清不掉。
       .then((keys) =>
         Promise.all(keys.filter((key) => key !== CACHE_VERSION).map((key) => caches.delete(key))),
       )
@@ -48,16 +62,17 @@ self.addEventListener('fetch', (event) => {
 
   // 导航请求：网络优先，断网回退到缓存的页面外壳
   if (request.mode === 'navigate') {
+    const shell = `${BASE}index.html`;
     event.respondWith(
       fetch(request)
         .then((response) => {
           const copy = response.clone();
-          void caches.open(CACHE_VERSION).then((cache) => cache.put('/index.html', copy));
+          void caches.open(CACHE_VERSION).then((cache) => cache.put(shell, copy));
           return response;
         })
         .catch(() =>
           caches
-            .match('/index.html')
+            .match(shell)
             .then((cached) => cached ?? new Response('离线，且没有缓存页面', { status: 503 })),
         ),
     );
@@ -65,7 +80,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // 带内容哈希的构建产物：缓存优先
-  if (url.pathname.startsWith('/assets/') || url.pathname === '/manifest.webmanifest') {
+  if (url.pathname.startsWith(`${BASE}assets/`) || url.pathname === `${BASE}manifest.webmanifest`) {
     event.respondWith(
       caches.match(request).then((cached) => {
         if (cached) return cached;

@@ -3,8 +3,8 @@
   "short_name": "自律岛",
   "description": "会管住你、也会陪着你的个人工作台：到点进专注，干完给宠物发工资。数据只存本机，无需账号。",
   "lang": "zh-CN",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#faf7f2",
@@ -12,13 +12,13 @@
   "categories": ["productivity", "lifestyle"],
   "icons": [
     {
-      "src": "/icon.svg",
+      "src": "./icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/icon-maskable.svg",
+      "src": "./icon-maskable.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "maskable"
@@ -27,11 +27,11 @@
   "shortcuts": [
     {
       "name": "统计",
-      "url": "/?view=stats"
+      "url": "./?view=stats"
     },
     {
       "name": "数据管理",
-      "url": "/?view=data"
+      "url": "./?view=data"
     }
   ]
 }
