@@ -1,0 +1,43 @@
+name: verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      - name: 类型检查（strict，禁止 any）
+        run: pnpm typecheck
+
+      - name: Lint（含架构铁律：domain 零依赖 + 数值集中配置）
+        run: pnpm lint
+
+      - name: 领域层单测 + 覆盖率
+        run: pnpm test:coverage
+
+      - name: 密钥扫描（禁止把 API Key 带进仓库）
+        run: |
+          if grep -rInE '(service_role|SUPABASE_SERVICE_ROLE_KEY|sk-[A-Za-z0-9]{20,})' \
+              --include='*.ts' --include='*.mjs' --include='*.json' \
+              --exclude-dir=node_modules .; then
+            echo "::error::检测到疑似密钥，请检查（AGENTS.md 第 8 节）"
+            exit 1
+          fi
+          echo "未发现疑似密钥"

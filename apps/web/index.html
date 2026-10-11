@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light" />
+    <title>自律岛 · 个人工作台</title>
+    <meta
+      name="description"
+      content="会管住你、也会陪着你的个人工作台：到点进专注，干完给宠物发工资。数据只存本机，无需账号。"
+    />
+
+    <!--
+      平台能力如实说明（AGENTS.md 原则 1：绝不假装有拦截能力）。
+      这条 meta 也会在「关于」页以完整文案呈现。
+    -->
+    <meta
+      name="petfocus-capability"
+      content="网页版为软约束：无法阻止其他程序启动。真实应用拦截需安装可选的 Windows 桌面增强包。"
+    />
+
+    <!-- PWA：可安装、可离线打开 -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
+    <meta name="theme-color" content="#e8a33d" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="自律岛" />
+
+    <!--
+      社交分享预览（简历里贴链接时会被抓取）。
+      刻意不依赖任何外部图片：用应用自己的图标，避免第三方请求与失效风险。
+    -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="自律岛 · 个人工作台" />
+    <meta
+      property="og:description"
+      content="到点进专注、干完给宠物发工资。数据只存本机，无需账号。"
+    />
+    <meta property="og:image" content="/icon.svg" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="自律岛 · 个人工作台" />
+    <meta
+      name="twitter:description"
+      content="到点进专注、干完给宠物发工资。数据只存本机，无需账号。"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,240 @@
+/**
+ * 宠物渲染与装扮叠加层的样式（features/pet/renderer.ts 使用）。
+ *
+ * ⚠️ 这个文件**必须保持普通 CSS，不能搬回 styles.css 的 Tailwind components 层**。
+ * 原因：Tailwind v3 会清除层内未被源码字面引用的类名，
+ * 而配件类名是运行时动态拼接的（`acc-` + trait 小写），
+ * 一旦放回 Tailwind 的处理范围，配件类会在构建时被删除，装扮预览将失效。
+ * 守卫：apps/web/src/features/pet/pet-css-build.test.ts（读构建产物断言）
+ *
+ * ── 坐标系（改形状前必读）────────────────────────────────
+ * 配件的 SVG 用 130×130 viewBox，每个单位 = 0.01rem，身体盒（65×60 单位）居中。
+ * 关键锚点：
+ *   身体盒        x 32.5–97.5, y 35–95
+ *   左耳圆心      (39, 46)   r 9.5
+ *   右耳圆心      (91, 46)   r 9.5
+ *   两耳中点      (65, 46)   ← 蝴蝶结结心
+ *   面部中心      (65, 60)
+ *   身体底部      y 95
+ * 因此配件可以超出身体盒（帽子向上、气球向右上），由更大的 viewBox 容纳。
+ */
+
+/* ─────────────────────────────────────────────────────────
+   身体
+   ───────────────────────────────────────────────────────── */
+
+.pet-stage {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 9rem;
+  height: 9rem;
+  transition: filter 400ms ease, opacity 400ms ease;
+}
+
+.pet-body {
+  position: relative;
+  width: 6.5rem;
+  height: 6rem;
+  border-radius: 50% 50% 46% 46%;
+  background: linear-gradient(160deg, #f6c177 0%, #e8a33d 70%, #d08f2c 100%);
+  box-shadow: inset -6px -8px 14px rgba(120, 80, 20, 0.18);
+}
+
+.pet-ear {
+  position: absolute;
+  top: -0.7rem;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50% 50% 40% 40%;
+  background: #e8a33d;
+}
+.pet-ear-left {
+  left: 0.7rem;
+  transform: rotate(-16deg);
+}
+.pet-ear-right {
+  right: 0.7rem;
+  transform: rotate(16deg);
+}
+
+.pet-face {
+  position: absolute;
+  inset: 1.3rem 1rem auto 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.1rem;
+}
+
+.pet-eye {
+  width: 0.62rem;
+  height: 0.78rem;
+  border-radius: 50%;
+  background: #3a2f28;
+  transition: transform 200ms ease;
+}
+
+.pet-mouth {
+  position: absolute;
+  bottom: -0.7rem;
+  width: 1rem;
+  height: 0.5rem;
+  border-bottom: 2px solid #3a2f28;
+  border-radius: 0 0 60% 60%;
+}
+
+/* 心情：蔫的时候低头、少动 */
+.pet-stage[data-mood='wilting'] .pet-body {
+  transform: translateY(0.35rem) rotate(-4deg);
+}
+.pet-stage[data-mood='happy'] .pet-body {
+  animation: pet-idle 2.4s ease-in-out infinite;
+}
+
+/* ─────────────────────────────────────────────────────────
+   配件挂载点
+   back  ：背景层，铺满舞台
+   front ：与身体同坐标系，放在 .pet-body 内部，因此会跟随身体动画
+   ───────────────────────────────────────────────────────── */
+
+.pet-accessories-back {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.pet-accessories-front {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* 配件容器：比身体盒大一倍，使超出身体的配件（帽子、气球）不被裁剪 */
+.acc {
+  position: absolute;
+  inset: -50%;
+  pointer-events: none;
+}
+
+.acc svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* 允许形状略微溢出 viewBox（例如帽檐），避免被裁掉 */
+  overflow: visible;
+}
+
+/* ─────────────────────────────────────────────────────────
+   蝴蝶结 BOW —— 结心在 (65, 46)，即两只耳朵正中间
+   ───────────────────────────────────────────────────────── */
+
+.acc-bow .bow-loop {
+  fill: #ef6f9b;
+  stroke: #c94f78;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+.acc-bow .bow-knot {
+  fill: #f58fb2;
+  stroke: #c94f78;
+  stroke-width: 1.5;
+}
+
+/* ─────────────────────────────────────────────────────────
+   草帽 HAT_STRAW —— 帽檐盖在头顶，帽顶向上鼓出
+   ───────────────────────────────────────────────────────── */
+
+.acc-hat-straw .hat-brim {
+  fill: #e8c67c;
+  stroke: #c9a24f;
+  stroke-width: 1.5;
+}
+.acc-hat-straw .hat-dome {
+  fill: #f2d99b;
+  stroke: #c9a24f;
+  stroke-width: 1.5;
+}
+.acc-hat-straw .hat-band {
+  fill: #c96f4a;
+  opacity: 0.85;
+}
+
+/* ─────────────────────────────────────────────────────────
+   发光皇冠 CROWN —— 三尖造型 + 光晕
+   ───────────────────────────────────────────────────────── */
+
+.acc-crown .crown-body {
+  fill: #ffd75e;
+  stroke: #d9a021;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 5px rgba(255, 205, 70, 0.9));
+}
+.acc-crown .crown-gem {
+  fill: #fff6c9;
+}
+
+/* ─────────────────────────────────────────────────────────
+   小手套 GLOVES —— 身体两侧各一只手
+   ───────────────────────────────────────────────────────── */
+
+.acc-gloves .glove {
+  fill: #e0885f;
+  stroke: #bd6a44;
+  stroke-width: 1.5;
+}
+
+/* ─────────────────────────────────────────────────────────
+   气球 BALLOON —— 右上飘着，一根线牵到身体边缘
+   ───────────────────────────────────────────────────────── */
+
+.acc-balloon .balloon-body {
+  fill: #ee6f8c;
+  stroke: #c94f6c;
+  stroke-width: 1.5;
+}
+.acc-balloon .balloon-shine {
+  fill: #ffd3de;
+  opacity: 0.85;
+}
+.acc-balloon .balloon-string {
+  fill: none;
+  stroke: #b8a79b;
+  stroke-width: 1.2;
+  stroke-linecap: round;
+}
+
+/* ─────────────────────────────────────────────────────────
+   提灯 LANTERN —— 左侧挂着，带暖光
+   ───────────────────────────────────────────────────────── */
+
+.acc-lantern .lantern-glow {
+  fill: #ffd98a;
+  opacity: 0.35;
+  filter: blur(3px);
+}
+.acc-lantern .lantern-frame {
+  fill: #f2b45a;
+  stroke: #a97c34;
+  stroke-width: 1.5;
+}
+.acc-lantern .lantern-handle {
+  fill: none;
+  stroke: #a97c34;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+/* ─────────────────────────────────────────────────────────
+   背景 SCENE_ROOM —— 暖色房间（默认场景）
+   ───────────────────────────────────────────────────────── */
+
+.acc-scene-room {
+  background:
+    radial-gradient(ellipse at 50% 15%, rgba(255, 214, 140, 0.5) 0%, transparent 60%),
+    linear-gradient(180deg, #f7ecd8 0%, #efdfc4 100%);
+}

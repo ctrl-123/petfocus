@@ -1,0 +1,32 @@
+# 依赖与构建产物
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+
+# 本地缓存（已重定向到仓库内，见 .npmrc 与用户级 .npmrc）
+.pnpm-store/
+.npm-cache/
+.npm-global/
+.tools/
+
+# 环境变量与密钥（AGENTS.md 第 8 节：绝不提交）
+.env
+.env.*
+!.env.example
+
+# 编辑器与系统
+.vscode/*
+!.vscode/extensions.json
+.idea/
+Thumbs.db
+desktop.ini
+*.lnk
+
+# 日志与临时文件
+*.log
+.pf-probe.cjs
+tools/.pnpm-download.zip
+
+# 覆盖率
+coverage/

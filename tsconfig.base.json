@@ -1,0 +1,39 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    /**
+     * lib 必须含 DOM：数据层用到 CryptoKey / crypto.subtle / btoa / TextEncoder / performance，
+     * 这些类型都在 DOM lib 里（浏览器与 Node 20+ 运行时都提供实现）。
+     * 领域层虽然逻辑上不碰 DOM，但共用同一份 lib 更简单，约束由 ESLint 的依赖铁律来保证。
+     */
+    "lib": ["ES2022", "DOM"],
+    /**
+     * 模块解析用 bundler 而不是 nodenext（踩过坑，别改回去）：
+     *
+     * Dexie 4.4.6 的 import-wrapper.d.mts 内容是 `export { default } from './dist/dexie.js'`，
+     * NodeNext 会把 './dist/dexie.js' 解析成 CJS 形态的 dist/dexie.d.ts，导致默认导出丢失，
+     * 于是 `class Db extends Dexie` 报 TS2507「不是构造函数类型」。
+     * 实测把 moduleResolution 换到 bundler 后立即通过。
+     *
+     * 这个选择也符合实际运行方式：数据层会被 Vite 打包进浏览器应用，属于 bundler 场景。
+     * 代价：不能用 rewriteRelativeImportExtensions（与 allowImportingTsExtensions 互斥），
+     * 因此源码统一书写带 `.ts` 的显式相对导入，对 Node 的类型剥离运行也更安全。
+     */
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "erasableSyntaxOnly": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  }
+}
