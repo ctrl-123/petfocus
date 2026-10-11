@@ -11,6 +11,8 @@ import {
 } from '@petfocus/shared';
 import type { WheelCategory } from '@petfocus/nutrition-db';
 import { Button } from '../components/Button.tsx';
+import { BarChart, BarChartLabels } from '../features/stats/BarChart.tsx';
+import { CHART_COLORS } from '../features/stats/chart-theme.ts';
 import { FoodWheel } from '../features/diet/FoodWheel.tsx';
 import {
   MEAL_SLOT_LABELS,
@@ -410,27 +412,28 @@ function TrendStrip({ trend }: { trend: DailyIntake[] }): JSX.Element {
   return (
     <figure className="m-0 rounded-card bg-white/70 p-4 ring-1 ring-ink-200">
       <h2 className="text-sm font-medium text-ink-700">近 7 天热量</h2>
-      <div className="mt-3 flex h-20 items-end gap-1" role="img" aria-label="近 7 天热量摄入柱状图">
-        {trend.map((day) => (
-          <div key={day.dayKey} className="flex min-w-0 flex-1 flex-col items-center justify-end">
-            <div
-              className={[
-                'w-full rounded-t',
-                day.hasData ? 'bg-amber-base' : 'bg-ink-200',
-              ].join(' ')}
-              style={{ height: `${Math.max(day.hasData ? 4 : 0, (day.nutrients.kcal / peak) * 100)}%` }}
-              title={`${day.dayKey}：${Math.round(day.nutrients.kcal)} 千卡`}
-            />
-          </div>
-        ))}
+      {/* 用 SVG 柱状图：柱高是算出来的像素坐标，不依赖父元素的百分比高度 */}
+      <div className="mt-3">
+        <BarChart
+          ariaLabel="近 7 天热量摄入柱状图"
+          height={80}
+          groupWidth={30}
+          maxValue={peak}
+          series={[
+            {
+              name: '热量',
+              color: CHART_COLORS.amberBase,
+              values: trend.map((day) => ({
+                key: day.dayKey,
+                value: day.nutrients.kcal,
+                color: day.hasData ? CHART_COLORS.amberBase : CHART_COLORS.empty,
+                title: `${day.dayKey}：${Math.round(day.nutrients.kcal)} 千卡`,
+              })),
+            },
+          ]}
+        />
       </div>
-      <div className="mt-1 flex gap-1">
-        {trend.map((day) => (
-          <span key={day.dayKey} className="min-w-0 flex-1 text-center text-[10px] text-ink-400">
-            {day.dayKey.slice(8)}
-          </span>
-        ))}
-      </div>
+      <BarChartLabels labels={trend.map((day) => day.dayKey.slice(8))} />
       <figcaption className="mt-2 text-xs text-ink-500">
         有记录的 {withData.length} 天平均 {Math.round(avg)} 千卡
       </figcaption>

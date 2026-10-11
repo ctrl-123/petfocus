@@ -14,6 +14,7 @@ import { Button } from '../components/Button.tsx';
 import { getRuntime } from '../app/runtime.ts';
 import { usePlatform } from '../platform/index.ts';
 import { DailyTaskForm } from '../features/tasks/DailyTaskForm.tsx';
+import { QuickAddTask } from '../features/tasks/QuickAddTask.tsx';
 import { TaskList } from '../features/tasks/TaskList.tsx';
 import { useTaskReminders } from '../features/tasks/use-task-reminders.ts';
 import {
@@ -215,6 +216,19 @@ export function HomePage({ now, capabilityDescription, onStartSession, petSlot }
 
       {/* 宠物：首页的情感锚点，也是本页的主角之一（PRD FR-6.2.2：不遮挡待办与操作按钮） */}
       {petSlot ? <div className="mb-4">{petSlot}</div> : null}
+
+      {/*
+        随手加一件：常驻在任务列表上方。
+        每日首次弹窗（上面那个）保持不变——它负责"排今天的计划"，
+        这个输入框负责"一天中间冒出来的新任务"。两者职责不同，都需要。
+      */}
+      <QuickAddTask
+        now={now}
+        onAdded={() => {
+          // reload 返回任务数组，这里只需要它执行完
+          void reload();
+        }}
+      />
 
       {showHint ? (
         <div className="mb-4 flex items-center justify-between gap-3 rounded-card bg-amber-soft/30 p-3">

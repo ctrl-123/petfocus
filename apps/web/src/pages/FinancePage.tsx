@@ -8,6 +8,8 @@ import {
   type FinanceType,
 } from '@petfocus/shared';
 import { Button } from '../components/Button.tsx';
+import { BarChart, BarChartLabels } from '../features/stats/BarChart.tsx';
+import { CHART_COLORS } from '../features/stats/chart-theme.ts';
 import {
   FINANCE_PRIVACY_NOTICE,
   addEntry,
@@ -474,29 +476,36 @@ function TrendChart({ trend }: { trend: DailyFinance[] }): JSX.Element {
   return (
     <figure className="m-0 rounded-card bg-white/70 p-4 ring-1 ring-ink-200">
       <h2 className="text-sm font-medium text-ink-700">近 14 天</h2>
-      <div className="mt-3 flex h-20 items-end gap-1" role="img" aria-label="近 14 天收支柱状图">
-        {trend.map((day) => (
-          <div key={day.dayKey} className="flex min-w-0 flex-1 items-end gap-[1px]">
-            <div
-              className="flex-1 rounded-t bg-clay-base/70"
-              style={{ height: `${Math.max(day.expenseCents > 0 ? 3 : 0, (day.expenseCents / peak) * 100)}%` }}
-              title={`${day.dayKey} 支出 ${formatMoney(day.expenseCents)}`}
-            />
-            <div
-              className="flex-1 rounded-t bg-moss-base/70"
-              style={{ height: `${Math.max(day.incomeCents > 0 ? 3 : 0, (day.incomeCents / peak) * 100)}%` }}
-              title={`${day.dayKey} 收入 ${formatMoney(day.incomeCents)}`}
-            />
-          </div>
-        ))}
+      {/* 用 SVG 柱状图：柱高是算出来的像素坐标，不依赖父元素的百分比高度 */}
+      <div className="mt-3">
+        <BarChart
+          ariaLabel="近 14 天收支柱状图"
+          height={80}
+          groupWidth={22}
+          maxValue={peak}
+          series={[
+            {
+              name: '支出',
+              color: CHART_COLORS.clayBase,
+              values: trend.map((day) => ({
+                key: day.dayKey,
+                value: day.expenseCents,
+                title: `${day.dayKey} 支出 ${formatMoney(day.expenseCents)}`,
+              })),
+            },
+            {
+              name: '收入',
+              color: CHART_COLORS.mossBase,
+              values: trend.map((day) => ({
+                key: day.dayKey,
+                value: day.incomeCents,
+                title: `${day.dayKey} 收入 ${formatMoney(day.incomeCents)}`,
+              })),
+            },
+          ]}
+        />
       </div>
-      <div className="mt-1 flex gap-1">
-        {trend.map((day) => (
-          <span key={day.dayKey} className="min-w-0 flex-1 text-center text-[9px] text-ink-400">
-            {day.dayKey.slice(8)}
-          </span>
-        ))}
-      </div>
+      <BarChartLabels labels={trend.map((day) => day.dayKey.slice(8))} />
       <figcaption className="mt-2 text-xs text-ink-500">
         红为支出、绿为收入（单位：元）
       </figcaption>

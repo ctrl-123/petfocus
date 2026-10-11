@@ -211,8 +211,8 @@ export async function seedDemoData(db: PetFocusDb, now: number): Promise<void> {
     mood: 82,
     satiety: 64,
     energy: 71,
-    equipped: { HEAD: 'outfit-bow', HAND: 'outfit-gloves' },
-    outfits: [{ HEAD: 'outfit-bow' }],
+    equipped: { HEAD: 'outfit-crown', HAND: 'outfit-gloves' },
+    outfits: [{ HEAD: 'outfit-crown' }],
     lastTickAt: now,
     interactedCount: 34,
     completedTasks: 21,
@@ -236,7 +236,9 @@ export async function seedDemoData(db: PetFocusDb, now: number): Promise<void> {
     });
   }
 
-  // ── 饮食：最近 7 天，每天 2–3 餐，菜色多样 ──
+  // ── 饮食：最近 14 天，每天 2–3 餐，菜色多样 ──
+  // 为什么要 14 天而不是 7 天：饮食模块的趋势图与统计页会看更长的窗口，
+  // 只有 7 天数据时更长的窗口就是一片空白。
   const mealPlan: ReadonlyArray<ReadonlyArray<{ name: string; grams: number; kcal: number; p: number; f: number; c: number }>> = [
     [
       { name: '豆浆', grams: 300, kcal: 93, p: 9, f: 4.8, c: 3.6 },
@@ -259,10 +261,27 @@ export async function seedDemoData(db: PetFocusDb, now: number): Promise<void> {
       { name: '原味酸奶', grams: 200, kcal: 144, p: 5, f: 5.4, c: 18.6 },
       { name: '苹果', grams: 200, kcal: 106, p: 0.4, f: 0.4, c: 27 },
     ],
+    [
+      { name: '皮蛋瘦肉粥', grams: 400, kcal: 208, p: 8.8, f: 4.4, c: 32.8 },
+      { name: '小笼包', grams: 180, kcal: 428, p: 14.4, f: 18.0, c: 51.5 },
+    ],
+    [
+      { name: '米饭', grams: 200, kcal: 232, p: 5.2, f: 0.6, c: 51.8 },
+      { name: '清蒸鲈鱼', grams: 200, kcal: 210, p: 37.0, f: 6.2, c: 0.8 },
+      { name: '蒜蓉西兰花', grams: 150, kcal: 120, p: 4.5, f: 8.7, c: 7.4 },
+    ],
+    [
+      { name: '燕麦片', grams: 60, kcal: 226, p: 8.4, f: 4.1, c: 39.0 },
+      { name: '水煮蛋', grams: 100, kcal: 147, p: 13.3, f: 8.8, c: 2.8 },
+      { name: '香蕉', grams: 120, kcal: 112, p: 1.7, f: 0.2, c: 26.2 },
+    ],
+    [
+      { name: '猪肉白菜饺子', grams: 300, kcal: 723, p: 27.3, f: 27.6, c: 91.2 },
+    ],
   ];
   const slots = ['BREAKFAST', 'LUNCH', 'DINNER'] as const;
 
-  for (let dayOffset = 6; dayOffset >= 0; dayOffset -= 1) {
+  for (let dayOffset = DEMO_DAYS - 1; dayOffset >= 0; dayOffset -= 1) {
     const noon = noonOf(now, dayOffset);
     const dayKey = dayKeyOf(noon);
     const mealsToday = dayOffset === 0 ? 2 : 3;
@@ -367,16 +386,53 @@ export async function seedDemoData(db: PetFocusDb, now: number): Promise<void> {
     }
   }
 
-  // 一笔工资，让净额是正的（更接近真实）
-  await db.financeEntries.put({
-    id: 'demo-finance-salary',
-    dayKey: shiftDayKey(todayKey, -8),
-    type: 'INCOME',
-    amountCents: 850000,
-    categoryId: 'cat-salary',
-    note: '月薪',
-    occurredAt: at(noonOf(now, 8), 10),
-  });
+  // ── 收入：铺满近 14 天中的多天 ──
+  // 为什么不能只放一笔工资：收支趋势图按天画，
+  // 只有一笔收入时那张图的绿色柱子只有一根，看起来"图是空的"。
+  // 真实生活里收入确实稀疏，但也不至于一个月只有一次——
+  // 报销、退款、兼职、红包都会零星发生。
+  const incomePlan: ReadonlyArray<{ cat: string; amountCents: number; note: string }> = [
+    { cat: 'cat-salary', amountCents: 850000, note: '月薪' },
+    { cat: 'cat-refund', amountCents: 12900, note: '退货退款' },
+    { cat: 'cat-parttime', amountCents: 80000, note: '周末兼职' },
+    { cat: 'cat-gift-money', amountCents: 20000, note: '朋友还的钱' },
+    { cat: 'cat-bonus', amountCents: 150000, note: '项目奖金' },
+    { cat: 'cat-investment', amountCents: 4360, note: '余额宝收益' },
+  ];
+  // 固定落在几个有代表性的日子：8 天前（月薪）、以及近两周内分散的 5 天
+  const incomeDays = [8, 12, 10, 6, 4, 2];
+  for (let i = 0; i < incomePlan.length; i += 1) {
+    const spec = incomePlan[i];
+    const dayOffset = incomeDays[i] ?? 3;
+    if (spec === undefined) continue;
+    const day = noonOf(now, dayOffset);
+    await db.financeEntries.put({
+      id: `demo-finance-income-${i}`,
+      dayKey: dayKeyOf(day),
+      type: 'INCOME',
+      amountCents: spec.amountCents,
+      categoryId: spec.cat,
+      note: spec.note,
+      occurredAt: at(day, 10),
+    });
+  }
+
+  // ── 支出：保证近 14 天每一天都有至少一笔 ──
+  // 否则趋势图里会出现"看起来断掉"的空白日，让人以为图坏了
+  for (let dayOffset = 13; dayOffset >= 0; dayOffset -= 1) {
+    const day = noonOf(now, dayOffset);
+    const dayKey = dayKeyOf(day);
+    const extra = cycle(financePlan, dayOffset + 5);
+    await db.financeEntries.put({
+      id: `demo-finance-extra-${dayKey}`,
+      dayKey,
+      type: 'EXPENSE',
+      amountCents: 800 + (dayOffset % 5) * 1200,
+      categoryId: 'cat-food',
+      note: extra.type === 'EXPENSE' ? '加餐' : '零碎开销',
+      occurredAt: at(day, 21),
+    });
+  }
 
   // 本月预算
   await db.financeBudgets.put({

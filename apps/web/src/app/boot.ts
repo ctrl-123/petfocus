@@ -79,28 +79,69 @@ export function shouldUseDemoMode(
 /** 演示用设备 ID（不参与真实结算） */
 const DEMO_DEVICE_ID = 'demo-device-00000000';
 
-/** 打开演示库并在为空时写入演示数据 */
+/**
+ * 演示数据的版本号。
+ *
+ * ⚠️ **每次修改 `demo-data.ts` 的内容都必须递增这个数字**。
+ *
+ * 为什么需要它：演示库一旦写过数据，`tasks.count() > 0`，就再也不会重新 seed。
+ * 于是"改了演示数据"在用户浏览器里**看不到效果**——他会以为改动没生效，
+ * 而实际上只是旧数据还在。这个版本号存在 KV 里，不匹配就清库重写。
+ */
+const DEMO_DATA_VERSION = 2;
+
+/** 打开演示库；数据缺失或版本过期时（重新）写入演示数据 */
 async function bootDemo(): Promise<BootResult> {
   const db = await openDb(DEMO_DB_NAME);
   const repositories = createDexieRepositories(db);
+  const kv = createDexieKeyValueStore(db);
 
-  // 只在空库时写入（避免每次进入都重复 seed）
-  const existing = await repositories.tasks.count();
-  if (existing === 0) {
+  const seededVersion = await kv.get<number>('demo.dataVersion');
+  const isEmpty = (await repositories.tasks.count()) === 0;
+  const stale = seededVersion !== DEMO_DATA_VERSION;
+
+  if (isEmpty || stale) {
     // ⚠️ 动态 import：演示数据里有几十条食物名与菜品名（约 10 KB），
     // 静态引入会把它打进首屏入口。守卫见 apps/web/src/bundle-budget.test.ts
     const { seedDemoData } = await import('./demo-data.ts');
+
+    // 版本过期时先清空：seed 用的是固定 id，不清会留下已删除项的残骸
+    // （例如上一版演示数据里存在、这一版不再生成的记录）
+    if (stale && !isEmpty) await clearDemoData(db);
+
     await seedDemoData(db, Date.now());
+    await kv.set('demo.dataVersion', DEMO_DATA_VERSION);
   }
 
   return {
     status: 'ready',
     persistent: true,
     repositories,
-    kv: createDexieKeyValueStore(db),
+    kv,
     db,
     demo: true,
   };
+}
+
+/**
+ * 清空演示库的业务表。
+ * **只在演示库上调用**——真实库绝不能走这里（演示数据与真实数据物理隔离）。
+ */
+async function clearDemoData(db: PetFocusDb): Promise<void> {
+  await Promise.all([
+    db.tasks.clear(),
+    db.sessions.clear(),
+    db.coinLedger.clear(),
+    db.quotaLedger.clear(),
+    db.pet.clear(),
+    db.inventory.clear(),
+    db.mealEntries.clear(),
+    db.fitnessRecords.clear(),
+    db.fitnessCheckins.clear(),
+    db.financeEntries.clear(),
+    db.financeCategories.clear(),
+    db.financeBudgets.clear(),
+  ]);
 }
 
 /** 打开数据库并装配一切；失败时自动降级 */

@@ -6,19 +6,27 @@
 
 ---
 
-## 0. 当前阶段：🚧 编码中（M8 第一阶段已完成：可部署）
+## 0. 当前阶段：🚀 已上线（GitHub Pages），进入迭代
 
 | 项 | 状态 |
 |---|---|
-| 已完成 | **M0–M7 全部** · **M8-1 导出/导入 UI + 演示模式 + PWA + Vercel 配置** |
-| 待办（M8-2） | Supabase Edge Functions（结算 + AI 营养回退）· 实际部署到你自己的 Vercel 账号 · Live2D spike · 换装台独立页 |
-| 部署步骤 | 见 `docs/部署指南.md`（含「需要你操作」的明确标注） |
+| 线上地址 | **https://ctrl-123.github.io/petfocus/** · 仓库 <https://github.com/ctrl-123/petfocus> |
+| 已完成 | **M0–M7 全部** · **M8-1**（导出/导入 UI + 演示模式 + PWA + 部署）· **M8-2 迭代**（侧边栏布局、SVG 图表修复、首页快速添加待办） |
+| 待办 | Supabase Edge Functions（结算 + AI 营养回退）· Live2D spike · 换装台独立页 · 组件测试与 E2E |
 
-**当前验证状态**：`pnpm verify` 全绿（**871 测试 / 0 失败**，行覆盖 96.2%、分支 93.1%、函数 90.1%）· `pnpm build` 入口 JS **337.0 KB / gzip 112.7 KB**（预算 350 KB）· 八个按需分块（ShopPanel 7.1 / demo-data 7.8 / SessionPage 9.8 / StatsPage 12.6 / FitnessPage 14.3 / DataPage 14.4 / FinancePage 19.0 / DietPage 93.6）
+**当前验证状态**：`pnpm verify` 全绿（**883 测试 / 0 失败**，行覆盖 96.3%、分支 92.9%、函数 90.1%）· `pnpm build` 入口 JS **341.8 KB / gzip 114.1 KB**（预算 350 KB）
+
+**部署方式**：推送到 `main` 即自动部署（`.github/workflows/deploy-pages.yml`）。
+页面在 `/petfocus/` 子目录下，因此构建必须传 `BASE_PATH=/petfocus/`。
+完整说明与踩过的坑见 `docs/部署指南.md`。
+
+**演示数据**：`?demo=1` 进入，用独立数据库 `petfocus-demo`（与真实数据物理隔离）。
+⚠️ **每次修改 `apps/web/src/app/demo-data.ts` 都必须递增 `boot.ts` 里的 `DEMO_DATA_VERSION`**，
+否则用户浏览器里还是旧演示数据，改动看起来"没生效"。
 
 ### 0.0 体积纪律（每次加功能都要看）
 
-首屏预算 350 KB，入口目前在 337 KB。因此：
+首屏预算 350 KB，入口目前在 **342 KB**——只剩 8 KB 余量，加任何东西前先想清楚。因此：
 
 - **新增页面一律用 `React.lazy` + `Suspense`**（见 `App.tsx`）
 - ⚠️ **懒加载的模块不能被静态 import**。商城的 `ShopPanel` 曾与首页的 `PetPanel`
@@ -32,12 +40,39 @@
 
 ### 0.0.1 统计图表是自绘 SVG，不要换成图表库
 
-`apps/web/src/features/stats/charts.tsx`。理由缺一不可：
+统一走 `apps/web/src/features/stats/BarChart.tsx`（柱状图与折线图）+ `chart-theme.ts`（色值）。理由缺一不可：
 
-1. **体积**：预算只剩十几 KB，任何图表库都装不下
+1. **体积**：预算只剩十几 KB，任何图表库都装不下（BarChart 单独分块仅 1.6 KB）
 2. **无障碍**：NFR-5.2 要求「图表必须提供文本等价物」，多数库默认做不到。
-   自绘的每个图表都带一个 `sr-only-focusable` 的 `<table>`（读屏可读、可搜索），
-   并且颜色不是唯一信息载体（同时有数值与 `title`）
+   每个图表都必须另外带一个 `sr-only-focusable` 的 `<table>`
+3. **颜色不能用动态类名**：Tailwind 会清除动态拼接的类名（见 §0.6），
+   所以 SVG 的 `fill` 必须用 `chart-theme.ts` 里的显式色值，不能用 `bg-*` 类
+
+### 0.0.1.1 ⚠️ 绝不用 CSS 百分比设置高度（真实踩过的严重 bug）
+
+**症状**：三张图表（每日专注 / 近 7 天热量 / 近 14 天收支）**在页面上完全是空的**，
+只有坐标轴标签在。而「专注日历」显示正常。
+typecheck 通过、lint 通过、全部单元测试通过、构建成功——**只有肉眼打开页面才看得出来**。
+
+**根因**：柱高用了 CSS 百分比，而**父元素高度是 `auto`**：
+
+```jsx
+<div className="flex h-32 items-end">        {/* 有确定高度 */}
+  <div className="flex flex-col justify-end"> {/* ← 高度 auto */}
+    <div style={{ height: '60%' }} />         {/* ← 百分比无处可依 → 塌成 0 */}
+```
+
+百分比高度只在**父元素有确定高度**时才解析。中间的 flex 包装层没给高度，链就断了。
+
+**修法**：改用 SVG，柱子的 `y` 与 `height` 由「值 ÷ 最大值 × 可用高度」算出**真实像素坐标**。
+不存在"父元素高度未定"这个类别的问题，也没有双轴对齐误差。
+
+**守卫**：`apps/web/src/features/stats/charts.test.ts` 扫描全部 `.tsx` 源码，
+禁止出现 `height: ...%`（会剔除注释，否则 `BarChart.tsx` 里当反例写的说明文字会误报）。
+
+**推广**：凡是"长度/位置由数值决定"的图形（进度条、热力块、柱、线），
+都用绝对坐标算，不要让 CSS 百分比去猜。这类 bug 的共同特征是
+**所有自动检查都绿，只有人眼能发现**——所以必须由源码级守卫兜住。
 
 ### 0.0.2 食物库的数据必须过校验器（不是靠肉眼）
 

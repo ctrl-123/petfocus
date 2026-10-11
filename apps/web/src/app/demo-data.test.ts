@@ -63,13 +63,24 @@ describe('seedDemoData：数据能被完整写入', () => {
     assert.ok(inventory > 3, `背包应有几件东西，实际 ${inventory}`);
   });
 
-  it('宠物存在且穿着装扮（首页第一眼就有内容）', async () => {
+  it('宠物存在且戴着装扮（首页第一眼就有内容）', async () => {
     const database = await seed();
     const pet = await createDexieRepositories(database).pet.get();
     assert.ok(pet, '演示模式必须有宠物');
     assert.equal(pet.name, '豆豆');
     assert.ok(pet.level >= 2, '演示宠物应有等级');
     assert.ok(Object.keys(pet.equipped).length > 0, '演示宠物应穿着装扮');
+  });
+
+  it('宠物戴的是发光皇冠（需求方指定，且要能看出皇冠真的渲染了）', async () => {
+    const database = await seed();
+    const pet = await createDexieRepositories(database).pet.get();
+    assert.ok(pet);
+    assert.equal(
+      pet.equipped.HEAD,
+      'outfit-crown',
+      '演示宠物的头饰应为发光皇冠（原来是蝴蝶结，需求方要求换掉）',
+    );
   });
 
   it('重复 seed 不会崩（幂等写入）', async () => {
@@ -104,6 +115,49 @@ describe('演示数据的"真实感"（评审者要能看出功能）', () => {
     const sessions = await createDexieRepositories(database).sessions.all();
     assert.ok(sessions.some((s) => s.kind === 'FOCUS'), '应有专注会话');
     assert.ok(sessions.some((s) => s.kind === 'LOCK'), '应有锁机会话');
+  });
+
+  it('近 14 天每天都有支出（趋势图不会出现"看起来断掉"的空白日）', async () => {
+    const database = await seed();
+    const entries = await createDexieRepositories(database).finance.all();
+    const expenseDays = new Set(
+      entries.filter((e) => e.type === 'EXPENSE').map((e) => e.dayKey),
+    );
+    assert.ok(
+      expenseDays.size >= 14,
+      `支出应覆盖 14 天以上，实际 ${expenseDays.size} 天`,
+    );
+  });
+
+  it('收入分布在多个日子（否则收支图里绿色只有一根，看着像空的）', async () => {
+    const database = await seed();
+    const entries = await createDexieRepositories(database).finance.all();
+    const incomeDays = new Set(
+      entries.filter((e) => e.type === 'INCOME').map((e) => e.dayKey),
+    );
+    assert.ok(
+      incomeDays.size >= 5,
+      `收入应分布在 5 天以上，实际 ${incomeDays.size} 天（只有 1 天时图表看起来是空的）`,
+    );
+  });
+
+  it('收入覆盖多种来源（工资之外还有报销/兼职/红包等）', async () => {
+    const database = await seed();
+    const entries = await createDexieRepositories(database).finance.all();
+    const incomeCats = new Set(
+      entries.filter((e) => e.type === 'INCOME').map((e) => e.categoryId),
+    );
+    assert.ok(incomeCats.size >= 4, `收入分类应有 4 种以上，实际 ${incomeCats.size}`);
+  });
+
+  it('饮食记录铺满 14 天（更长的统计窗口也有数据）', async () => {
+    const database = await seed();
+    const meals = await createDexieRepositories(database).meals.all();
+    const mealDays = new Set(meals.map((m) => m.dayKey));
+    assert.ok(
+      mealDays.size >= 14,
+      `饮食应覆盖 14 天，实际 ${mealDays.size} 天（少于窗口长度时趋势图会有空档）`,
+    );
   });
 
   it('账目里既有收入也有支出，净额为正（更像真实生活）', async () => {

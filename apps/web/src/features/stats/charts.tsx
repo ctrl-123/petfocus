@@ -9,6 +9,8 @@
  * 颜色不是唯一的信息载体——柱状图同时有数值标签与 title。
  */
 import { formatDuration, type DailyStat, type HeatLevel, type HourBucket } from '@petfocus/shared';
+import { BarChart, BarChartLabels } from './BarChart.tsx';
+import { CHART_COLORS } from './chart-theme.ts';
 
 // ─────────────────────────────────────────────────────────────
 // 每日专注柱状图
@@ -30,32 +32,24 @@ export function DailyFocusChart({ daily, maxMs }: DailyFocusChartProps): JSX.Ele
 
   return (
     <figure className="m-0">
-      <div className="flex h-32 items-end gap-[3px]" role="img" aria-label="每日专注时长柱状图">
-        {daily.map((d) => {
-          const ratio = peak <= 0 ? 0 : d.focusMs / peak;
-          const heightPct = Math.max(d.focusMs > 0 ? 2 : 0, ratio * 100);
-          return (
-            <div key={d.dayKey} className="flex min-w-0 flex-1 flex-col items-center justify-end">
-              <div
-                className={[
-                  'w-full rounded-t transition-[height]',
-                  d.focusMs > 0 ? 'bg-amber-base' : 'bg-ink-200',
-                ].join(' ')}
-                style={{ height: `${heightPct}%` }}
-                title={`${d.dayKey}：专注 ${formatDuration(d.focusMs)}`}
-              />
-            </div>
-          );
-        })}
-      </div>
+      {/* 用 SVG 柱状图：柱高是算出来的像素坐标，不依赖父元素的百分比高度 */}
+      <BarChart
+        ariaLabel="每日专注时长柱状图"
+        maxValue={peak}
+        series={[
+          {
+            name: '专注',
+            color: CHART_COLORS.amberBase,
+            values: daily.map((d) => ({
+              key: d.dayKey,
+              value: d.focusMs,
+              title: `${d.dayKey}：专注 ${formatDuration(d.focusMs)}`,
+            })),
+          },
+        ]}
+      />
       {showLabels ? (
-        <div className="mt-1 flex gap-[3px]">
-          {daily.map((d) => (
-            <span key={d.dayKey} className="min-w-0 flex-1 text-center text-[10px] text-ink-400">
-              {d.dayKey.slice(8)}
-            </span>
-          ))}
-        </div>
+        <BarChartLabels labels={daily.map((d) => d.dayKey.slice(8))} />
       ) : null}
       <figcaption className="mt-2 text-xs text-ink-500">
         峰值 {formatDuration(peak)} · 共 {daily.length} 天
@@ -210,27 +204,31 @@ export function HourChart({ buckets }: HourChartProps): JSX.Element {
 
   return (
     <figure className="m-0">
-      <div className="flex h-24 items-end gap-[2px]" role="img" aria-label="按时段分布的专注时长">
-        {buckets.map((b) => (
-          <div
-            key={b.hour}
-            className={[
-              'min-w-0 flex-1 rounded-t',
-              labelOf(b) === bestLabel ? 'bg-moss-base' : totalOf(b) > 0 ? 'bg-amber-base' : 'bg-ink-200',
-            ].join(' ')}
-            style={{ height: `${Math.max(totalOf(b) > 0 ? 3 : 0, (totalOf(b) / peak) * 100)}%` }}
-            title={`${labelOf(b)}：${formatDuration(totalOf(b))}`}
-          />
-        ))}
-      </div>
+      <BarChart
+        ariaLabel="按时段分布的专注时长"
+        height={112}
+        maxValue={peak}
+        series={[
+          {
+            name: '专注',
+            // 最高的时段用绿色突出，其余用主色；无数据用中性色
+            color: CHART_COLORS.amberBase,
+            values: buckets.map((b) => ({
+              key: String(b.hour),
+              value: totalOf(b),
+              color:
+                labelOf(b) === bestLabel
+                  ? CHART_COLORS.mossBase
+                  : totalOf(b) > 0
+                    ? CHART_COLORS.amberBase
+                    : CHART_COLORS.empty,
+              title: `${labelOf(b)}：${formatDuration(totalOf(b))}`,
+            })),
+          },
+        ]}
+      />
       {/* 只标 0/6/12/18 点，24 个标签在窄屏上会糊在一起 */}
-      <div className="mt-1 flex gap-[2px]">
-        {buckets.map((b) => (
-          <span key={b.hour} className="min-w-0 flex-1 text-center text-[9px] text-ink-400">
-            {b.hour % 6 === 0 ? b.hour : ''}
-          </span>
-        ))}
-      </div>
+      <BarChartLabels labels={buckets.map((b) => String(b.hour))} every={6} />
       <figcaption className="mt-2 text-xs text-ink-600">
         你的高效时段是 <b className="text-moss-deep">{bestLabel}</b>（累计{' '}
         {formatDuration(totalOf(best))}）
