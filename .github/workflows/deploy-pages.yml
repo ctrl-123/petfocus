@@ -68,9 +68,43 @@ jobs:
         env:
           BASE_PATH: /petfocus/
 
-      # 让 Pages 直到站点根路径，PWA 的 scope 才不会跑偏
+      # ⚠️ 必须先在 GitHub 网页上把 Pages 的 Source 设为「GitHub Actions」。
+      # 只设一次即可；GitHub 会据此创建 Pages 站点，之后本工作流永久可用。
+      #
+      # 为什么不能靠 enablement: true 自动创建：
+      # 创建 Pages 站点属于**仓库管理级操作**，而自动的 GITHUB_TOKEN
+      # 在任何 permissions 配置下都无法执行管理操作（这是刻意的安全边界）。
+      # 加了 enablement: true 只会把 "Get Pages site failed" 换成
+      # "Resource not accessible by integration"，仍然失败。
+      #
+      # 也不要指望 GitHub Pages 的「Static HTML」预设按钮：
+      # 那是给"把 HTML 直接提交到分支"用的，会与本工作流冲突。
       - name: 配置 Pages
+        id: configure
         uses: actions/configure-pages@v5
+        with:
+          # 显式声明不尝试自动启用：靠上面那次网页设置。
+          # 这样失败时的错误信息就是真正的 "Get Pages site failed"，
+          # 而不是被 enablement 掩盖成 "Resource not accessible by integration"。
+          enablement: false
+
+      # 只在配置失败时给出可执行的指引。
+      # 用 outcome 判断而不是 if: failure()，后者会连带影响后续步骤是否执行，语义不清晰。
+      - name: 给出修复指引
+        if: steps.configure.outcome == 'failure'
+        run: |
+          echo "=================================================="
+          echo "  Pages is not enabled yet, or the setting has not"
+          echo "  taken effect on GitHub's side."
+          echo ""
+          echo "  Fix: Settings > Pages > Build and deployment"
+          echo "       Source = GitHub Actions"
+          echo "  Then come back to Actions and click 'Re-run all jobs'."
+          echo ""
+          echo "  Do NOT click the 'Static HTML' preset button: it is for"
+          echo "  committing HTML to a branch and conflicts with this workflow."
+          echo "=================================================="
+          exit 1
 
       - name: 上传产物
         uses: actions/upload-pages-artifact@v3
